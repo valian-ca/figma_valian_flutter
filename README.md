@@ -41,25 +41,54 @@ By automating the conversion process, FigDart aims to eliminate these issues, ma
 ### Dev Mode on View Only Access
 <img src="publish/dev_mode.gif" align="center" alt="How the plugin works in dev mode" />
 
-## Further features
+## Generated Output
 
-### Use Theme Extensions
+### Text Styles
 
-You may choose to register your textstyles as a theme extension.
+Generated text styles use plain `const TextStyle` constructors with `fontFamily` references, designed for use with **bundled variable fonts** for maximum fidelity with Figma designs:
 
-### Editor Mode
-<img src="publish/theme_extension_editor_mode.gif" align="center" alt="theme extension editor mode" />
+```dart
+static const TextStyle titleMedium = TextStyle(
+    fontFamily: 'Archivo',
+    fontSize: 16,
+    fontWeight: .w500,
+    height: 1.375,
+    letterSpacing: 0.15,
+    fontStyle: .normal,
+    decoration: .none,
+  );
+```
 
-### Dev Mode on View Only Access
-<img src="publish/theme_extension_dev_mode.gif" align="center" alt="theme extension dev mode" />
+- Line height is precisely converted to Flutter's `height` multiplier (up to 4 decimal places)
+- Letter spacing handles both pixel and percentage units from Figma
+- Non-default OpenType features are mapped to Flutter `FontFeature` constructors
+- A `TextTheme` mapping is auto-generated matching style names to Material 3 theme slots
 
-### Vary textstyle properties
+### Color Variables
 
-You may select some other textstyle properties like font family
+Color variables are extracted with alias resolution (up to 10 levels deep) and mapped to Material 3 `ColorScheme` instances per Figma mode.
 
-TODO:
-- [x] Text decoration
-- [x] letter spacing
-- [x] line height.
+## Recommended Flutter Setup
 
-<img src="publish/options.png" align="center" alt="textstyle options" />
+For best results, bundle variable font files (download from Google Fonts) and wrap your app with `DefaultTextHeightBehavior` to match Figma's leading distribution:
+
+```yaml
+# pubspec.yaml
+fonts:
+  - family: Archivo
+    fonts:
+      - asset: assets/fonts/Archivo-VariableFont_wdth,wght.ttf
+      - asset: assets/fonts/Archivo-Italic-VariableFont_wdth,wght.ttf
+        style: italic
+```
+
+```dart
+DefaultTextHeightBehavior(
+  textHeightBehavior: const TextHeightBehavior(
+    leadingDistribution: TextLeadingDistribution.even,
+    applyHeightToFirstAscent: false,
+    applyHeightToLastDescent: false,
+  ),
+  child: MaterialApp(/* ... */),
+)
+```

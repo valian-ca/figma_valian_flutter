@@ -1,121 +1,62 @@
-async function generateTextStyles(useThemeExtensions: boolean, includeFontName: boolean): Promise<string> {
+async function generateTextStyles(): Promise<string> {
     try {
         const textStyles = await figma.getLocalTextStylesAsync();
         if (textStyles.length === 0) {
             return "No defined textstyles";
         }
-        let dartCode = "import 'package:flutter/material.dart';\n\n";
+        let dartCode = "import 'package:flutter/material.dart';\nimport 'package:google_fonts/google_fonts.dart';\n\n";
 
-        if (useThemeExtensions) {
-            // For AppTextTheme
-            dartCode += "@immutable\nclass AppTextTheme extends ThemeExtension<AppTextTheme> {\n";
+        dartCode += "// ignore: avoid_classes_with_only_static_members\nabstract class AppTextStyles {\n";
+        textStyles.forEach((style, index) => {
+            const formattedStyleName = formatStyleName(style.name, index);
+            const {
+                fontSize,
+                fontStyle,
+                fontWeight,
+                textDecoration,
+                letterSpacing,
+                fontFamily,
+                lineHeightUnit,
+                lineHeightValue,
+                fontFeatures
+            } = extractTextStyleProperties(style);
 
-            // Generate fields
-            textStyles.forEach((style, index) => {
-                const formattedStyleName = formatStyleName(style.name, index);
-                dartCode += `  final TextStyle? ${formattedStyleName};\n`;
-            });
+            dartCode += generateTextStyleDartCode(
+                formattedStyleName,
+                { fontSize, fontStyle, fontWeight, textDecoration, letterSpacing, fontFamily, lineHeightUnit, lineHeightValue, fontFeatures },
+            );
+        });
 
-            // Generate constructor
-            dartCode += "\n   const AppTextTheme({\n";
-            textStyles.forEach((style, index) => {
-                const formattedStyleName = formatStyleName(style.name, index);
-                dartCode += `    this.${formattedStyleName},\n`;
-            });
-            dartCode += "  });\n\n";
+        dartCode += "}\n\n";
 
-            // Generate fallback constructor
-            dartCode += "  const AppTextTheme.fallback()\n      : this(\n";
-            textStyles.forEach((style, index) => {
-                const {
-                    fontSize,
-                    fontStyle,
-                    fontWeight,
-                    textDecoration,
-                    letterSpacing,
-                    fontFamily,
-                    lineHeightValue
-                } = extractTextStyleProperties(style);
-                const formattedStyleName = formatStyleName(style.name, index);
+        // Generate TextTheme mapping
+        const themeSlots = [
+            'displayLarge', 'displayMedium', 'displaySmall',
+            'headlineLarge', 'headlineMedium', 'headlineSmall',
+            'titleLarge', 'titleMedium', 'titleSmall',
+            'bodyLarge', 'bodyMedium', 'bodySmall',
+            'labelLarge', 'labelMedium', 'labelSmall',
+        ];
 
-                dartCode += `        ${formattedStyleName}: const TextStyle(\n`;
-                dartCode += `          fontSize: ${fontSize},\n`;
-                dartCode += `          fontWeight: FontWeight.w${fontWeight},\n`;
+        const styleNames = textStyles.map((style, index) => formatStyleName(style.name, index));
 
-                if (includeFontName) {
-                    dartCode += `          fontFamily: "${fontFamily}",\n`;
-                }
-
-                if (lineHeightValue !== 'null') {
-                    const height = Math.round((lineHeightValue / fontSize) * 100) / 100;
-                    dartCode += `          height: ${height},\n`;
-                }
-
-                if (letterSpacing != null && letterSpacing !== 0) {
-                    const roundedLetterSpacing = Math.round((letterSpacing * fontSize / 100) * 100) / 100;
-                    dartCode += `          letterSpacing: ${roundedLetterSpacing},\n`;
-                }
-                dartCode += `          fontStyle: ${fontStyle},\n`;
-                dartCode += `          decoration: ${textDecoration},\n`;
-                dartCode += `        ),\n`;
-            });
-            dartCode += "      );\n\n";
-
-            // Generate copyWith method
-            dartCode += "  @override\n  AppTextTheme copyWith({\n";
-            textStyles.forEach((style, index) => {
-                const formattedStyleName = formatStyleName(style.name, index);
-                dartCode += `    TextStyle? ${formattedStyleName},\n`;
-            });
-            dartCode += "  }) {\n    return AppTextTheme(\n";
-            textStyles.forEach((style, index) => {
-                const formattedStyleName = formatStyleName(style.name, index);
-                dartCode += `      ${formattedStyleName}: ${formattedStyleName} ?? this.${formattedStyleName},\n`;
-            });
-            dartCode += "    );\n  }\n\n";
-
-            // Generate lerp method
-            dartCode += "  @override\n  AppTextTheme lerp(AppTextTheme? other, double t) {\n";
-            dartCode += "    if (other is! AppTextTheme) return this;\n";
-            dartCode += "    return AppTextTheme(\n";
-            textStyles.forEach((style, index) => {
-                const formattedStyleName = formatStyleName(style.name, index);
-                dartCode += `      ${formattedStyleName}: TextStyle.lerp(${formattedStyleName}, other.${formattedStyleName}, t),\n`;
-            });
-            dartCode += "    );\n  }\n";
-
-        } else {
-            // Original TextStyles class
-            dartCode += "abstract class AppTextStyles {\n";
-            textStyles.forEach((style, index) => {
-                const formattedStyleName = formatStyleName(style.name, index);
-                const {
-                    fontSize,
-                    fontStyle,
-                    fontWeight,
-                    textDecoration,
-                    letterSpacing,
-                    fontFamily,
-                    lineHeightValue
-                } = extractTextStyleProperties(style);
-
-                dartCode += generateTextStyleDartCode(
-                    formattedStyleName,
-                    {
-                        fontSize,
-                        fontStyle,
-                        fontWeight,
-                        textDecoration,
-                        letterSpacing,
-                        fontFamily,
-                        lineHeightValue
-                    },
-                    includeFontName,
-                );
-            });
+        // Match each theme slot to a generated style by checking if the style name ends with the slot name (case-insensitive)
+        const mappings: { slot: string; styleName: string }[] = [];
+        for (const slot of themeSlots) {
+            const match = styleNames.find(name => name.toLowerCase().endsWith(slot.toLowerCase()));
+            if (match) {
+                mappings.push({ slot, styleName: match });
+            }
         }
 
-        dartCode += "}\n";
+        if (mappings.length > 0) {
+            dartCode += "const textTheme = TextTheme(\n";
+            mappings.forEach(({ slot, styleName }) => {
+                dartCode += `  ${slot}: AppTextStyles.${styleName},\n`;
+            });
+            dartCode += ");\n";
+        }
+
         return dartCode;
     } catch (error) {
         console.error('An error occurred:', error);
@@ -123,114 +64,130 @@ async function generateTextStyles(useThemeExtensions: boolean, includeFontName: 
     }
 }
 
+
+async function resolveColorValue(value: any, modeId: string, depth: number = 0): Promise<RGBA | null> {
+    if (depth > 10 || !value) return null;
+
+    if (value.type === 'VARIABLE_ALIAS') {
+        const refVar = await figma.variables.getVariableByIdAsync(value.id);
+        if (!refVar) return null;
+        const refValue = refVar.valuesByMode[modeId];
+        if (refValue) {
+            return resolveColorValue(refValue, modeId, depth + 1);
+        }
+        // Fallback: try the first available mode
+        const firstModeId = Object.keys(refVar.valuesByMode)[0];
+        if (firstModeId) {
+            return resolveColorValue(refVar.valuesByMode[firstModeId], modeId, depth + 1);
+        }
+        return null;
+    }
+
+    if (typeof value.r === 'number' && typeof value.g === 'number' && typeof value.b === 'number') {
+        return { r: value.r, g: value.g, b: value.b, a: value.a ?? 1 };
+    }
+
+    return null;
+}
 
 async function generateColors(): Promise<string> {
     try {
-        const localColorStyles = await figma.getLocalPaintStylesAsync();
+        const variables = await figma.variables.getLocalVariablesAsync('COLOR');
+        const collections = await figma.variables.getLocalVariableCollectionsAsync();
 
-        if (localColorStyles.length === 0) {
-            return "No defined colors";
+        if (variables.length === 0) {
+            return "No defined color variables";
         }
 
         let dartCode = "import 'package:flutter/material.dart';\n\n";
-        dartCode += 'abstract class AppColors {\n';
+        dartCode += "final class AppMaterialTheme {\n";
+        dartCode += "  const AppMaterialTheme._();\n\n";
 
-        localColorStyles.forEach((style, index) => { // Changed to forEach to get index
-            const paint = style.paints[0]; // assuming the first paint is what you want
-            if (paint.type === 'SOLID') {
-                const r = paint.color.r;
-                const g = paint.color.g;
-                const b = paint.color.b;
-                const opacity = paint.opacity || 1;
+        // Track colors for ColorScheme mapping: modeName → (colorSchemeProperty → classVarName)
+        const modeColorMappings = new Map<string, Map<string, string>>();
 
-                dartCode += generateColorStyleDartCode(formatColorName(style.name, index), r, g, b, opacity); // Passed index
-            } else if (paint.type === 'GRADIENT_LINEAR') {
-                // Assuming stops is an array of color stop objects containing color and position
-                const stops = paint.gradientStops.map(stop => {
-                    const { r, g, b } = stop.color;
-                    const a = 1;
-                    return `Color(0x${toHex(a)}${toHex(r)}${toHex(g)}${toHex(b)})`;
-                }).join(', ');
+        for (const collection of collections) {
+            const collectionVars = variables.filter(v => v.variableCollectionId === collection.id);
 
-                dartCode += `  static const ${formatColorName(style.name, index)} = LinearGradient(colors: [${stops}]);\n\n`; // Passed index
-            }
-        });
-
-        dartCode += '}\n';
-        return dartCode;
-    } catch (error) {
-        console.error('An error occurred:', error);
-        return '';
-    }
-}
-
-async function generateEffectStyles(): Promise<string> {
-    try {
-        const localEffectStyles = await figma.getLocalEffectStylesAsync();
-
-        if (localEffectStyles.length === 0) {
-            return "No defined effect styles";
-        }
-
-        let dartCode = "import 'package:flutter/material.dart';\n\n";
-        dartCode += 'abstract class AppEffectStyles {\n';
-
-        localEffectStyles.forEach((style, index) => {
-            const formattedStyleName = formatEffectStyleName(style.name, index);
-            const effects = style.effects; // Array of effects
-
-            effects.forEach((effect, effectIndex) => {
-                const effectName = `${formattedStyleName}Effect${effectIndex}`;
-                if (effect.type === "DROP_SHADOW" || effect.type === "INNER_SHADOW") {
-                    const { color, offset, radius, spread } = effect;
-                    const { r, g, b, a } = color;
-                    const colorCode = `Color(0x${toHex(a)}${toHex(r)}${toHex(g)}${toHex(b)})`;
-                    const offsetCode = `Offset(${offset.x}, ${offset.y})`;
-                    dartCode += `  static const BoxShadow ${effectName} = BoxShadow(\n`;
-                    dartCode += `    color: ${colorCode},\n`;
-                    dartCode += `    offset: ${offsetCode},\n`;
-                    dartCode += `    blurRadius: ${radius},\n`;
-                    dartCode += `    spreadRadius: ${spread},\n`;
-                    dartCode += `  );\n\n`;
-                } else if (effect.type === "LAYER_BLUR" || effect.type === "BACKGROUND_BLUR") {
-                    const { radius } = effect;
-                    dartCode += `  static const double ${effectName}BlurRadius = ${radius};\n\n`;
+            for (const mode of collection.modes) {
+                const modeLower = mode.name.toLowerCase();
+                if (!modeColorMappings.has(modeLower)) {
+                    modeColorMappings.set(modeLower, new Map());
                 }
-            });
-        });
 
-        dartCode += '}\n';
+                for (const variable of collectionVars) {
+                    const rawValue = variable.valuesByMode[mode.modeId];
+                    const color = await resolveColorValue(rawValue, mode.modeId);
+                    if (!color) continue;
+
+                    const hexColor = `${toHex(color.a)}${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
+                    const varName = formatColorVariableName(mode.name, variable.name);
+
+                    dartCode += `  /// ${variable.name} = Color(0x${hexColor})\n`;
+                    dartCode += `  static const Color ${varName} = Color(0x${hexColor});\n\n`;
+
+                    const schemeProp = variableNameToColorSchemeProperty(variable.name);
+                    if (colorSchemePropertyOrder.indexOf(schemeProp) >= 0) {
+                        modeColorMappings.get(modeLower)!.set(schemeProp, varName);
+                    }
+                }
+            }
+        }
+
+        dartCode += "}\n\n";
+
+        // Generate ColorScheme for each mode
+        for (const [modeName, colorMap] of modeColorMappings) {
+            if (colorMap.size === 0) continue;
+
+            const brightness = modeName === 'dark' ? 'Brightness.dark' : 'Brightness.light';
+            dartCode += `const ColorScheme ${modeName}ColorScheme = ColorScheme(\n`;
+            dartCode += `  brightness: ${brightness},\n`;
+
+            for (const prop of colorSchemePropertyOrder) {
+                const varName = colorMap.get(prop);
+                if (varName) {
+                    dartCode += `  ${prop}: AppMaterialTheme.${varName},\n`;
+                }
+            }
+
+            dartCode += ");\n\n";
+        }
+
         return dartCode;
     } catch (error) {
         console.error('An error occurred:', error);
         return '';
     }
 }
+
 
 function generateTextStyleDartCode(
     styleName: string,
-    { fontSize, fontStyle, fontWeight, textDecoration, letterSpacing, fontFamily, lineHeightValue }: any,
-    includeFontName: boolean
+    { fontSize, fontStyle, fontWeight, textDecoration, letterSpacing, fontFamily, lineHeightUnit, lineHeightValue, fontFeatures }: any,
 ): string {
     let code = `  static const TextStyle ${styleName} = TextStyle(\n`;
+    code += `    fontFamily: '${fontFamily}',\n`;
     code += `    fontSize: ${fontSize},\n`;
-    code += `    fontWeight: FontWeight.w${fontWeight},\n`;
-
-    if (includeFontName) {
-        code += `    fontFamily: "${fontFamily}",\n`;
-    }
+    code += `    fontWeight: .w${fontWeight},\n`;
 
     if (lineHeightValue !== 'null') {
-        const height = Math.round((lineHeightValue / fontSize) * 100) / 100;
-        code += `    height: ${height},\n`;
+        const height = lineHeightUnit === 'PERCENT'
+            ? lineHeightValue / 100
+            : lineHeightValue / fontSize;
+        code += `    height: ${parseFloat(height.toFixed(4))},\n`;
     }
 
     if (letterSpacing != null && letterSpacing !== 'null' && letterSpacing !== 0) {
-        const roundedLetterSpacing = Math.round((letterSpacing * fontSize / 100) * 100) / 100;
-        code += `    letterSpacing: ${roundedLetterSpacing},\n`;
+        code += `    letterSpacing: ${parseFloat(letterSpacing.toFixed(4))},\n`;
     }
-    code += `    fontStyle: ${fontStyle},\n`;
-    code += `    decoration: ${textDecoration},\n`;
+    code += `    fontStyle: .${fontStyle.split('.')[1]},\n`;
+    code += `    decoration: .${textDecoration.split('.')[1]},\n`;
+
+    if (fontFeatures && fontFeatures.length > 0) {
+        code += `    fontFeatures: [${fontFeatures.join(', ')}],\n`;
+    }
+
     code += `  );\n\n`;
 
     return code;
