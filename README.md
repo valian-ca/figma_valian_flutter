@@ -2,6 +2,16 @@
 
 A Figma plugin that generates Flutter/Dart code from Figma design tokens. It extracts text styles and color variables from a Figma file and outputs ready-to-use Dart code with `const TextStyle` constructors (designed for bundled variable fonts) and Material 3 `ColorScheme` mappings.
 
+## Installation
+
+1. Download `plugin.zip` from the [latest release](https://github.com/valian-ca/figma_valian_flutter/releases/latest)
+2. Unzip it anywhere on your computer (e.g. `~/figma-plugins/figma-valian-flutter/`)
+3. Open Figma, then go to **Plugins > Development > Import plugin from manifest...**
+4. Select the `manifest.json` file from the folder you just unzipped
+5. The plugin now appears under **Plugins > Development** and is ready to use
+
+To update, download the latest zip again and replace the files in the same folder. Figma will pick up the changes automatically.
+
 ## Features
 
 ### Generate TextStyles
@@ -43,15 +53,6 @@ Inspects selected frames for design quality issues before developer handoff:
 - Detects hardcoded (unbound) fill and stroke colors
 - Detects text nodes not using a shared text style
 - Results link directly to offending nodes in Figma for quick fixes
-
-## Installation
-
-This plugin is distributed as a development plugin.
-
-1. Download `plugin.zip` from the [latest release](../../releases/latest)
-2. Extract the zip into any folder
-3. In Figma, go to **Plugins > Development > Import plugin from manifest...**
-4. Select the `manifest.json` file from the extracted folder
 
 ## Recommended Flutter Setup
 
