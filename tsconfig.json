@@ -6,7 +6,7 @@
     "target": "es6",
     "lib": ["es6"],
     "strict": true,
-    "outFile": "src/main.js",
+    "outFile": "dist/main.js",
     "typeRoots": [
       "./node_modules/@types",
       "./node_modules/@figma"

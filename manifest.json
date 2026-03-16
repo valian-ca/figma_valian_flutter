@@ -1,7 +1,7 @@
 {
   "name": "Figma VALIAN Flutter",
   "api": "1.0.0",
-  "main": "src/main.js",
+  "main": "dist/main.js",
   "capabilities": [
     "inspect"
   ],
@@ -10,7 +10,7 @@
     "figma",
     "dev"
   ],
-  "ui": "src/ui.html",
+  "ui": "dist/ui.html",
   "documentAccess": "dynamic-page",
   "networkAccess": {
     "allowedDomains": [

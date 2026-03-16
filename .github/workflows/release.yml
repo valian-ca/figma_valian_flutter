@@ -1,0 +1,36 @@
+name: Release Plugin
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Package plugin
+        run: |
+          cp manifest.json dist/manifest.json
+          sed -i 's|dist/||g' dist/manifest.json
+          cd dist && zip ../plugin.zip manifest.json main.js ui.html
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ steps.sha.outputs.short }}
+          name: Build ${{ steps.sha.outputs.short }}
+          files: plugin.zip
+          make_latest: true
