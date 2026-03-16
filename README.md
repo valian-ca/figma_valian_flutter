@@ -1,51 +1,12 @@
-<p align="center">
-  <a href="https://www.figma.com/community-free-resource-license/"><img src="https://img.shields.io/badge/figma-community_license-brightgreen?style=flat-square&logo=figma"></a>
-  <a href="https://github.com/mastersam07/figdart/graphs/commit-activity"><img src="https://img.shields.io/badge/Maintained%3F-Yes-success.svg?style=flat-square"></a>
-  <a href="https://github.com/mastersam07/figdart/pulls"><img src="https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=flat-square"></a>
-  <a href="https://twitter.com/intent/tweet?text=Figdart%20is%20awesome.%20I%20use%20it%20to%20generate%20flutter%20styling%20properties%20from%20figma.%20https://github.com/mastersam07/figdart"><img src="https://img.shields.io/badge/Twitter-Tweet-success?style=flat-square&logo=x"></a>
-</p>
+# Figma VALIAN Flutter
 
+A Figma plugin that generates Flutter/Dart code from Figma design tokens. It extracts text styles and color variables from a Figma file and outputs ready-to-use Dart code with `const TextStyle` constructors (designed for bundled variable fonts) and Material 3 `ColorScheme` mappings.
 
+## Features
 
-<p align="center"><img src="./publish/icon.png" align="center" alt="FigDart logo" width="128" height="128"></p>
-  
-<h1 align="center">Figma Styles to Flutter</h1>
+### Generate TextStyles
 
-<div align="center">
-<a href="https://www.figma.com/community/plugin/1282135889870206898/FigDart" align="center"><img src="publish/install_button.png" align="center" alt="Install Plugin"></a>
-</div>
-
-<br />
-
-<img src="publish/demo.gif" align="center" alt="Figdart demo" />
-
-
-## The Problem
-
-When it comes to translating styles like textstyles and colors, there are a couple of problems that could arise. Some includes:
-
-- Manually converting Figma text styles to Flutter code
-- Greater risk of inconsistencies appearing in text styles between the design files and the coded application
-- Manually converting styles often results in code duplication
-- Manual conversion can lead to errors such as incorrect values, typos, or even omitted styles, which can be costly to debug and fix
-- Every time a designer updates a text style in Figma, developers have to manually update the corresponding code, which is both time-consuming and error-prone
-
-## Solution
-
-By automating the conversion process, FigDart aims to eliminate these issues, making the design-to-code workflow more efficient, accurate, and consistent.
-
-### Editor Mode
-<img src="publish/editor_mode.gif" align="center" alt="How the plugin works in editor mode" />
-
-
-### Dev Mode on View Only Access
-<img src="publish/dev_mode.gif" align="center" alt="How the plugin works in dev mode" />
-
-## Generated Output
-
-### Text Styles
-
-Generated text styles use plain `const TextStyle` constructors with `fontFamily` references, designed for use with **bundled variable fonts** for maximum fidelity with Figma designs:
+Reads all local text styles from the Figma file and produces an `AppTextStyles` class with `const TextStyle` constructors:
 
 ```dart
 static const TextStyle titleMedium = TextStyle(
@@ -59,18 +20,42 @@ static const TextStyle titleMedium = TextStyle(
   );
 ```
 
-- Line height is precisely converted to Flutter's `height` multiplier (up to 4 decimal places)
-- Letter spacing handles both pixel and percentage units from Figma
-- Non-default OpenType features are mapped to Flutter `FontFeature` constructors
-- A `TextTheme` mapping is auto-generated matching style names to Material 3 theme slots
+- Uses `fontFamily` references for bundled variable fonts (not `google_fonts`)
+- Line height precisely converted to Flutter's `height` multiplier (up to 4 decimal places)
+- Handles both PIXELS and PERCENT line height units from Figma
+- Letter spacing rounded to 4 decimal places to strip IEEE 754 float artifacts
+- Non-default OpenType features mapped to Flutter `FontFeature` constructors
+- Auto-generates a `TextTheme` mapping matching style names to Material 3 theme slots
 
-### Color Variables
+### Generate Colors
 
-Color variables are extracted with alias resolution (up to 10 levels deep) and mapped to Material 3 `ColorScheme` instances per Figma mode.
+Reads color variables (not paint styles) and produces an `AppMaterialTheme` class with per-mode `ColorScheme` instances:
+
+- Resolves variable aliases recursively (up to 10 levels deep)
+- Produces `static const Color` constants prefixed with the Figma mode name (e.g. `lightSchemesPrimary`, `darkSchemesOnPrimary`)
+- Auto-maps variable names to Material 3 `ColorScheme` properties by matching the last path segment
+- Generates a complete `ColorScheme` per mode
+
+### Check Design
+
+Inspects selected frames for design quality issues before developer handoff:
+
+- Detects hardcoded (unbound) fill and stroke colors
+- Detects text nodes not using a shared text style
+- Results link directly to offending nodes in Figma for quick fixes
+
+## Installation
+
+This plugin is distributed as a development plugin.
+
+1. Download `plugin.zip` from the [latest release](../../releases/latest)
+2. Extract the zip into any folder
+3. In Figma, go to **Plugins > Development > Import plugin from manifest...**
+4. Select the `manifest.json` file from the extracted folder
 
 ## Recommended Flutter Setup
 
-For best results, bundle variable font files (download from Google Fonts) and wrap your app with `DefaultTextHeightBehavior` to match Figma's leading distribution:
+For best results, bundle variable font files and wrap your app with `DefaultTextHeightBehavior` to match Figma's leading distribution:
 
 ```yaml
 # pubspec.yaml
@@ -92,3 +77,17 @@ DefaultTextHeightBehavior(
   child: MaterialApp(/* ... */),
 )
 ```
+
+## Development
+
+```bash
+npm install
+npm run build    # compile to dist/
+npm run watch    # rebuild on changes
+```
+
+The build outputs `dist/main.js` and copies `src/ui.html` to `dist/ui.html`. The root `manifest.json` references these paths for local development.
+
+## Credits
+
+Forked from [FigDart](https://github.com/Mastersam07/figdart) by Samuel Abada.
