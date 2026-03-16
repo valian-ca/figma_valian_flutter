@@ -140,7 +140,7 @@ async function generateColors(): Promise<string> {
         for (const [modeName, colorMap] of modeColorMappings) {
             if (colorMap.size === 0) continue;
 
-            const brightness = modeName === 'dark' ? 'Brightness.dark' : 'Brightness.light';
+            const brightness = modeName === 'dark' ? '.dark' : '.light';
             dartCode += `const ColorScheme ${modeName}ColorScheme = ColorScheme(\n`;
             dartCode += `  brightness: ${brightness},\n`;
 
