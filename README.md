@@ -52,7 +52,7 @@ Inspects selected frames for design quality issues before developer handoff:
 
 - Detects hardcoded (unbound) fill and stroke colors
 - Detects text nodes not using a shared text style
-- Skips locked layers and their children (lock device mockup frames to exclude them from the report)
+- Skips locked, hidden, and underscore-prefixed layers and their children
 - Results link directly to offending nodes in Figma for quick fixes
 
 ## Recommended Flutter Setup
