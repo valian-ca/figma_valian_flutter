@@ -29,7 +29,7 @@ function rgbaToHex(r: number, g: number, b: number): string {
 }
 
 function collectNodes(node: SceneNode): SceneNode[] {
-    if (node.locked) return [];
+    if (node.locked || !node.visible || node.name.startsWith('_')) return [];
     const nodes: SceneNode[] = [node];
     if ('children' in node) {
         for (const child of node.children) {
