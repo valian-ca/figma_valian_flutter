@@ -102,6 +102,26 @@ function checkTextStyleOnNode(node: SceneNode): TextStyleIssue | null {
     };
 }
 
+function runCheck(allNodes: SceneNode[]): DesignCheckResult {
+    const hardcodedColors: ColorIssue[] = [];
+    const unboundTextStyles: TextStyleIssue[] = [];
+
+    for (const node of allNodes) {
+        hardcodedColors.push(...checkColorsOnNode(node));
+        const textIssue = checkTextStyleOnNode(node);
+        if (textIssue) unboundTextStyles.push(textIssue);
+    }
+
+    const hasIssues = hardcodedColors.length > 0 || unboundTextStyles.length > 0;
+
+    return {
+        status: hasIssues ? 'HAS ISSUES' : 'CLEAN',
+        nodesScanned: allNodes.length,
+        hardcodedColors,
+        unboundTextStyles,
+    };
+}
+
 async function checkDesign(): Promise<DesignCheckResult> {
     const selection = figma.currentPage.selection;
 
@@ -120,21 +140,27 @@ async function checkDesign(): Promise<DesignCheckResult> {
         allNodes.push(...collectNodes(selected));
     }
 
-    const hardcodedColors: ColorIssue[] = [];
-    const unboundTextStyles: TextStyleIssue[] = [];
+    return runCheck(allNodes);
+}
 
-    for (const node of allNodes) {
-        hardcodedColors.push(...checkColorsOnNode(node));
-        const textIssue = checkTextStyleOnNode(node);
-        if (textIssue) unboundTextStyles.push(textIssue);
+async function checkDesignByIds(nodeIds: string[]): Promise<DesignCheckResult> {
+    const allNodes: SceneNode[] = [];
+    for (const id of nodeIds) {
+        const node = await figma.getNodeByIdAsync(id);
+        if (node && node.type !== 'DOCUMENT' && node.type !== 'PAGE') {
+            allNodes.push(...collectNodes(node as SceneNode));
+        }
     }
 
-    const hasIssues = hardcodedColors.length > 0 || unboundTextStyles.length > 0;
+    if (allNodes.length === 0) {
+        return {
+            status: 'ERROR',
+            nodesScanned: 0,
+            hardcodedColors: [],
+            unboundTextStyles: [],
+            error: 'Watched frames no longer exist.',
+        };
+    }
 
-    return {
-        status: hasIssues ? 'HAS ISSUES' : 'CLEAN',
-        nodesScanned: allNodes.length,
-        hardcodedColors,
-        unboundTextStyles,
-    };
+    return runCheck(allNodes);
 }

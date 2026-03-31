@@ -138,6 +138,39 @@
       vertical-align: middle;
       margin-right: 4px;
     }
+
+    .btn-watch-active {
+      background: #1a7f37;
+      border-color: #1a7f37;
+      color: #fff;
+    }
+    .btn-watch-active:hover {
+      background: #156d2e;
+      border-color: #156d2e;
+    }
+    .btn-watch-active:active {
+      background: #115c26;
+    }
+
+    .watch-indicator {
+      font-size: 12px;
+      color: #57606a;
+      margin-bottom: 8px;
+    }
+    .watch-indicator .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #1a7f37;
+      margin-right: 4px;
+      vertical-align: middle;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
   </style>
 </head>
 
@@ -147,6 +180,11 @@
     <button id="generateTextStyles" class="btn-primary">Generate TextStyles</button>
     <button id="generateColors" class="btn-primary">Generate Colors</button>
     <button id="checkDesign">Check Design</button>
+    <button id="watchDesign">Watch</button>
+  </div>
+
+  <div id="watchIndicator" class="watch-indicator" style="display: none;">
+    <span class="dot"></span> Watching: <span id="watchTarget"></span>
   </div>
 
   <div id="codeSection" style="display: none;">
@@ -165,11 +203,24 @@
       window.parent.postMessage({ pluginMessage: { type: 'generate-colors' } }, '*');
     };
 
+    var watching = false;
+
     document.getElementById('checkDesign').onclick = () => {
       document.getElementById('codeSection').style.display = 'none';
       document.getElementById('checkResult').style.display = 'block';
       document.getElementById('checkResult').innerHTML = 'Checking…';
       window.parent.postMessage({ pluginMessage: { type: 'design-check' } }, '*');
+    };
+
+    document.getElementById('watchDesign').onclick = () => {
+      if (watching) {
+        window.parent.postMessage({ pluginMessage: { type: 'stop-watch' } }, '*');
+      } else {
+        document.getElementById('codeSection').style.display = 'none';
+        document.getElementById('checkResult').style.display = 'block';
+        document.getElementById('checkResult').innerHTML = 'Starting watch…';
+        window.parent.postMessage({ pluginMessage: { type: 'start-watch' } }, '*');
+      }
     };
 
     window.onmessage = (event) => {
@@ -181,6 +232,34 @@
       }
       if (msg.type === 'design-check-result') {
         renderCheckResult(msg.result);
+      }
+      if (msg.type === 'watch-started') {
+        watching = true;
+        var btn = document.getElementById('watchDesign');
+        btn.textContent = 'Stop Watching';
+        btn.classList.add('btn-watch-active');
+        var targetEl = document.getElementById('watchTarget');
+        targetEl.innerHTML = msg.watchNodes.map(function(n) {
+          return '<span class="node-link" data-node-id="' + escapeHtml(n.id) + '">' + escapeHtml(n.name) + '</span>';
+        }).join(', ');
+        targetEl.querySelectorAll('.node-link').forEach(function(link) {
+          link.addEventListener('click', function() {
+            var nodeId = this.getAttribute('data-node-id');
+            window.parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: nodeId } }, '*');
+          });
+        });
+        document.getElementById('watchIndicator').style.display = 'block';
+      }
+      if (msg.type === 'watch-stopped') {
+        watching = false;
+        var btn = document.getElementById('watchDesign');
+        btn.textContent = 'Watch';
+        btn.classList.remove('btn-watch-active');
+        document.getElementById('watchIndicator').style.display = 'none';
+      }
+      if (msg.type === 'watch-error') {
+        document.getElementById('checkResult').style.display = 'block';
+        document.getElementById('checkResult').innerHTML = '<span class="status-error">' + escapeHtml(msg.error) + '</span>';
       }
     };
 
