@@ -4,7 +4,7 @@ async function generateTextStyles(): Promise<string> {
         if (textStyles.length === 0) {
             return "No defined textstyles";
         }
-        let dartCode = "import 'package:flutter/material.dart';\nimport 'package:google_fonts/google_fonts.dart';\n\n";
+        let dartCode = "import 'package:flutter/material.dart';\n\n";
 
         dartCode += "// ignore: avoid_classes_with_only_static_members\nabstract class AppTextStyles {\n";
         textStyles.forEach((style, index) => {
