@@ -123,8 +123,7 @@ async function generateColors(): Promise<string> {
                     const hexColor = `${toHex(color.a)}${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
                     const varName = formatColorVariableName(mode.name, variable.name);
 
-                    dartCode += `  /// ${variable.name} = Color(0x${hexColor})\n`;
-                    dartCode += `  static const Color ${varName} = Color(0x${hexColor});\n\n`;
+                    dartCode += `  static const Color ${varName} = Color(0x${hexColor});\n`;
 
                     const schemeProp = variableNameToColorSchemeProperty(variable.name);
                     if (colorSchemePropertyOrder.indexOf(schemeProp) >= 0) {
