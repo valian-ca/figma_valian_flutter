@@ -29,6 +29,11 @@ if (figma.editorType === 'figma' || figma.editorType === 'dev') {
             figma.ui.postMessage({ type: 'dart-code', code: dartCode });
         }
 
+        if (msg.type === 'generate-variable-manifest') {
+            let json = await generateVariableManifest();
+            figma.ui.postMessage({ type: 'dart-code', code: json });
+        }
+
         if (msg.type === 'design-check') {
             const result = await checkDesign();
             figma.ui.postMessage({ type: 'design-check-result', result });

@@ -24,6 +24,7 @@
 
     .button-row {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 16px;
     }
@@ -179,6 +180,7 @@
   <div class="button-row">
     <button id="generateTextStyles" class="btn-primary">Generate TextStyles</button>
     <button id="generateColors" class="btn-primary">Generate Colors</button>
+    <button id="generateVariableManifest" class="btn-primary">Generate variable manifest</button>
     <button id="checkDesign">Check Design</button>
     <button id="watchDesign">Watch</button>
   </div>
@@ -189,7 +191,10 @@
 
   <div id="codeSection" style="display: none;">
     <pre id="codeBlock"></pre>
-    <p><button id="copyButton" onclick="copyToClipboard()">Copy</button></p>
+    <p>
+      <button id="copyButton" onclick="copyToClipboard()">Copy</button>
+      <button id="downloadButton" onclick="downloadCode()">Download</button>
+    </p>
   </div>
 
   <div id="checkResult"></div>
@@ -201,6 +206,16 @@
 
     document.getElementById('generateColors').onclick = () => {
       window.parent.postMessage({ pluginMessage: { type: 'generate-colors' } }, '*');
+    };
+
+    document.getElementById('generateVariableManifest').onclick = () => {
+      var b = document.getElementById('generateVariableManifest');
+      b.disabled = true;
+      b.textContent = 'Generating…';
+      document.getElementById('codeSection').style.display = 'block';
+      document.getElementById('checkResult').style.display = 'none';
+      document.getElementById('codeBlock').textContent = '⏳ Starting…';
+      window.parent.postMessage({ pluginMessage: { type: 'generate-variable-manifest' } }, '*');
     };
 
     var watching = false;
@@ -225,7 +240,15 @@
 
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
+      if (msg.type === 'manifest-progress') {
+        document.getElementById('codeSection').style.display = 'block';
+        document.getElementById('checkResult').style.display = 'none';
+        document.getElementById('codeBlock').textContent = '⏳ ' + msg.message;
+      }
       if (msg.type === 'dart-code') {
+        var mb = document.getElementById('generateVariableManifest');
+        mb.disabled = false;
+        mb.textContent = 'Generate variable manifest';
         document.getElementById('codeBlock').textContent = msg.code;
         document.getElementById('codeSection').style.display = 'block';
         document.getElementById('checkResult').style.display = 'none';
@@ -338,6 +361,24 @@
       document.body.removeChild(textarea);
       document.getElementById('copyButton').textContent = 'Copied!';
       setTimeout(() => { document.getElementById('copyButton').textContent = 'Copy'; }, 1500);
+    }
+
+    // Download the current code block as a file. JSON content (the variable
+    // manifest) downloads as variables.json; anything else as a .dart file.
+    function downloadCode() {
+      const text = document.getElementById('codeBlock').textContent;
+      const isJson = text.trim().charAt(0) === '{';
+      const filename = isJson ? 'variables.json' : 'app_generated.dart';
+      const mime = isJson ? 'application/json' : 'text/plain';
+      const blob = new Blob([text], { type: mime + ';charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
   </script>

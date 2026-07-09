@@ -5,6 +5,9 @@
   "capabilities": [
     "inspect"
   ],
+  "permissions": [
+    "teamlibrary"
+  ],
   "enableProposedApi": false,
   "editorType": [
     "figma",

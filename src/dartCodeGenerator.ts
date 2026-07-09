@@ -161,6 +161,127 @@ async function generateColors(): Promise<string> {
 }
 
 
+// Derives a platform-neutral kebab-case token from a variable name.
+// "Green/11" -> "green-11", "Sage/2" -> "sage-2", "Colors/Amber/3" -> "colors-amber-3",
+// "On Primary" -> "on-primary". Each platform builder maps it to its own form
+// (Flutter AppColors.green11, web bg-green-11 / var(--green-11)).
+function tokenFromVariableName(name: string): string {
+    return name
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2') // split camelCase boundaries
+        .replace(/[^a-zA-Z0-9]+/g, '-')         // separators (/, space, _) -> hyphen
+        .toLowerCase()
+        .replace(/^-+|-+$/g, '')                // trim leading/trailing hyphens
+        .replace(/-+/g, '-');                   // collapse repeats
+}
+
+// Sends a progress line to the UI so long runs show a live status.
+function reportManifestProgress(message: string): void {
+    figma.ui.postMessage({ type: 'manifest-progress', message });
+}
+
+// Walks every page and returns the distinct set of variable-alias ids bound on
+// any node. This is the exact set of ids a consumer REST dump of this file can
+// reference. The walk is ITERATIVE and yields to the event loop every few
+// thousand nodes so Figma stays responsive on huge files (100k+ nodes).
+async function collectAllBoundVariableIds(): Promise<string[]> {
+    await figma.loadAllPagesAsync();
+    const set = new Set<string>();
+    const stack: SceneNode[] = [];
+    for (const page of figma.root.children) {
+        for (const child of page.children) stack.push(child);
+    }
+    let scanned = 0;
+    while (stack.length > 0) {
+        const node = stack.pop()!;
+        scanned++;
+        for (const id of extractBoundVarIds(node)) set.add(id);
+        if ('children' in node) {
+            const children = (node as ChildrenMixin).children;
+            for (let i = 0; i < children.length; i++) stack.push(children[i] as SceneNode);
+        }
+        if (scanned % 4000 === 0) {
+            reportManifestProgress(`Scanning nodes… ${scanned} (${set.size} variables found)`);
+            await new Promise<void>(resolve => setTimeout(resolve, 0)); // yield: keep Figma responsive
+        }
+    }
+    return Array.from(set);
+}
+
+// Produces the flat .figma/variables.json resolution manifest, ready to commit:
+//   { "<key>": "<kebab-token>", ... }   (bare string values, no debug)
+// It RESOLVES every bound variable id with getVariableByIdAsync — which resolves
+// both local variables and subscribed-library variables referenced in-file, even
+// when the library is not import-enabled. Keys are the builder-normalized id, so
+// the pipeline lookup matches exactly:
+//   key = aliasId.replace(/^VariableID:/,"").split("/")[0];  manifest[key]
+//   subscribed VariableID:<key>/<suffix> -> <key>;  flat VariableID:<localId> -> <localId>
+async function generateVariableManifest(): Promise<string> {
+    try {
+        const manifest: Record<string, string> = {};
+
+        // 1) Collect every bound variable id (yields to keep Figma responsive).
+        reportManifestProgress('Loading pages…');
+        const boundIds = await collectAllBoundVariableIds();
+
+        // 2) Resolve each id in batches, reporting progress between batches.
+        const BATCH = 100;
+        for (let i = 0; i < boundIds.length; i += BATCH) {
+            const batch = boundIds.slice(i, i + BATCH);
+            const resolved = await Promise.all(batch.map(async id => {
+                try { return { id, v: await figma.variables.getVariableByIdAsync(id) }; }
+                catch (e) { return { id, v: null as Variable | null }; }
+            }));
+            for (const { id, v } of resolved) {
+                if (!v || v.resolvedType !== 'COLOR') continue;
+                const token = tokenFromVariableName(v.name);
+                manifest[id.replace(/^VariableID:/, '').split('/')[0]] = token; // builder lookup key
+                if (v.key) manifest[v.key] = token;                            // stable published key
+            }
+            reportManifestProgress(`Resolving variables… ${Math.min(i + BATCH, boundIds.length)}/${boundIds.length}`);
+        }
+
+        // 3) Also include local color variables not bound to any node.
+        reportManifestProgress('Adding local variables…');
+        const localVars = await figma.variables.getLocalVariablesAsync('COLOR');
+        for (const v of localVars) {
+            const token = tokenFromVariableName(v.name);
+            if (v.key) manifest[v.key] = token;
+            manifest[v.id.replace(/^VariableID:/, '')] = token;
+        }
+
+        if (Object.keys(manifest).length === 0) return 'No color variables found';
+        return JSON.stringify(manifest, null, 2);
+    } catch (error) {
+        console.error('An error occurred:', error);
+        return 'Error: ' + (error instanceof Error ? error.message : String(error));
+    }
+}
+
+
+// Collects every VARIABLE_ALIAS id bound on a node, across all boundVariables
+// fields (fills, strokes, effects, sizing, radii, componentProperties, …).
+// boundVariables values are either a single {type,id}, an array of them, or a
+// nested map (component properties), so we handle all three shapes.
+function extractBoundVarIds(node: SceneNode): string[] {
+    const bv = (node as any).boundVariables;
+    if (!bv) return [];
+    const ids: string[] = [];
+    const push = (v: any) => {
+        if (v && v.type === 'VARIABLE_ALIAS' && typeof v.id === 'string') ids.push(v.id);
+    };
+    for (const field of Object.keys(bv)) {
+        const val = bv[field];
+        if (Array.isArray(val)) {
+            val.forEach(push);
+        } else if (val && val.type === 'VARIABLE_ALIAS') {
+            push(val);
+        } else if (val && typeof val === 'object') {
+            for (const k of Object.keys(val)) push(val[k]);
+        }
+    }
+    return ids;
+}
+
 function generateTextStyleDartCode(
     styleName: string,
     { fontSize, fontStyle, fontWeight, textDecoration, letterSpacing, fontFamily, lineHeightUnit, lineHeightValue, fontFeatures }: any,
